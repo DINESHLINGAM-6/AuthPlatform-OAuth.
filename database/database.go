@@ -1,37 +1,41 @@
 package database
 
 import (
-	"fmt"
-	"os"
-
 	"auth-system/models"
+	"log"
+	"os"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
 
-func InitDB() error {
+// InitDB initializes the database connection and auto-migrates the schema
+func InitDB() {
 	// Load database configuration from environment variables
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_SSLMODE"),
-	)
+	dbHost := os.Getenv("DB_HOST")
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
+	dbPort := os.Getenv("DB_PORT")
+	dbSSLMode := os.Getenv("DB_SSLMODE")
 
+	// Create the connection string
+	dsn := "host=" + dbHost + " user=" + dbUser + " password=" + dbPassword +
+		" dbname=" + dbName + " port=" + dbPort + " sslmode=" + dbSSLMode
+
+	// Connect to the database
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
+		log.Fatal("Failed to connect to database:", err)
 	}
 
 	// Auto-migrate the User model
-	if err := DB.AutoMigrate(&models.User{}); err != nil {
-		return fmt.Errorf("failed to auto-migrate models: %w", err)
+	err = DB.AutoMigrate(&models.User{})
+	if err != nil {
+		log.Fatal("Failed to auto-migrate database:", err)
 	}
 
-	return nil
+	log.Println("Database connected and schema migrated successfully")
 }

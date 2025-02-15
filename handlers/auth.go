@@ -3,74 +3,73 @@ package handlers
 import (
 	"auth-system/database"
 	"auth-system/models"
-	"encoding/json"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Signup handles user registration
-func Signup(w http.ResponseWriter, r *http.Request) {
+func Signup(c *gin.Context) {
 	var user models.User
-	err := json.NewDecoder(r.Body).Decode(&user)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+
+	// Bind JSON request body to the user struct
+	if err := c.ShouldBindJSON(&user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// Hash the password
 	if err := user.HashPassword(user.Password); err != nil {
-		http.Error(w, "Could not hash password", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not hash password"})
 		return
 	}
 
 	// Save the user to the database
 	if err := database.DB.Create(&user).Error; err != nil {
-		http.Error(w, "Could not create user", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create user"})
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "User created successfully"})
+	c.JSON(http.StatusCreated, gin.H{"message": "User created successfully"})
 }
 
 // Login handles user authentication
-func Login(w http.ResponseWriter, r *http.Request) {
+func Login(c *gin.Context) {
 	var input struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
-	err := json.NewDecoder(r.Body).Decode(&input)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	// Bind JSON request body to the input struct
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// Find the user by email
 	var user models.User
 	if err := database.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
 	// Check the password
 	if err := user.CheckPassword(input.Password); err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
-	// Generate JWT token (optional)
+	// Generate JWT token
 	token, err := GenerateJWT(user.Email)
 	if err != nil {
-		http.Error(w, "Could not generate token", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"token": token})
+	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
 // ProtectedRoute is an example of a protected route
-func ProtectedRoute(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "You are authenticated"})
+func ProtectedRoute(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "You are authenticated"})
 }
